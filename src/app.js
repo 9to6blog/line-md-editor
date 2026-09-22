@@ -508,7 +508,8 @@ function applySettings() {
   r.setProperty("--editor-font", `"${s.editorFont.replaceAll('"', "")}"`);
   r.setProperty("--preview-font", `"${s.previewFont.replaceAll('"', "")}"`);
   r.setProperty("--editor-size", (s.fontSize * s.zoom) / 100 + "px");
-  r.setProperty("--preview-size", (s.previewSize * s.zoom) / 100 + "px");
+  r.setProperty("--preview-size", s.previewSize + "px");
+  $("#preview").style.zoom = s.zoom / 100;
   r.setProperty(
     "--toolbar",
     isDark()

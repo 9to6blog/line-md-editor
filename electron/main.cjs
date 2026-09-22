@@ -323,9 +323,28 @@ if (!testMode && !app.requestSingleInstanceLock()) {
           filters: [{ name: format.toUpperCase(), extensions: [format] }],
         });
         if (result.canceled) return null;
+        const fontRules = store.data.customFonts
+          .filter((font) =>
+            [
+              store.data.settings.editorFont,
+              store.data.settings.previewFont,
+            ].includes(font.family),
+          )
+          .map(
+            (font) =>
+              `@font-face{font-family:"${font.family}";src:url("${font.url}")}`,
+          )
+          .join("");
+        if (fontRules) html = html.replace("<style>", "<style>" + fontRules);
         if (format === "md") atomicWrite(result.filePath, doc.content);
         else if (format === "html") atomicWrite(result.filePath, html);
         else {
+          const printFile = path.join(
+            store.root,
+            "exports",
+            require("node:crypto").randomUUID() + ".html",
+          );
+          atomicWrite(printFile, html);
           const print = new BrowserWindow({
             show: false,
             webPreferences: {
@@ -335,11 +354,9 @@ if (!testMode && !app.requestSingleInstanceLock()) {
             },
           });
           try {
-            await print.loadURL(
-              "data:text/html;charset=utf-8," + encodeURIComponent(html),
-            );
+            await print.loadFile(printFile);
             await print.webContents.executeJavaScript(
-              "document.fonts.ready.then(()=>true)",
+              "Promise.all([document.fonts.ready,...Array.from(document.images, image=>image.complete?Promise.resolve():new Promise(resolve=>{image.onload=resolve;image.onerror=resolve;setTimeout(resolve,10000)}))]).then(()=>true)",
             );
             const buffer = await print.webContents.printToPDF({
               printBackground: true,
@@ -349,6 +366,7 @@ if (!testMode && !app.requestSingleInstanceLock()) {
             fs.writeFileSync(result.filePath, buffer);
           } finally {
             print.destroy();
+            if (fs.existsSync(printFile)) fs.unlinkSync(printFile);
           }
         }
         return result.filePath;
